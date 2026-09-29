@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# Herramientas
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Secretos y configuración local (las claves van en variables de entorno)
+.env
+.env.*
+!.env.example
+
+# Datos generados por la herramienta
+*.db
+*.sqlite
+*.sqlite3
+data/
+reports/
+exports/
+
+# Laboratorio: claves privadas de los certificados de prueba
+lab/certs/*.key
+lab/certs/*.pem
+
+# IDE / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
