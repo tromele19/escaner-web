@@ -5,7 +5,7 @@ Herramienta de línea de comandos en Python que audita la **configuración de se
 > Proyecto de la asignatura **Proyectos de Ciberseguridad** — Grado en Ingeniería de Software, mención en Ciberseguridad (U-TAD), curso 2026/2027.
 > Autor: Arturo Igor Diez Cardenas.
 
-## ⚠️ Uso responsable
+## Uso responsable
 
 Esta herramienta **solo debe utilizarse contra sitios propios o sobre los que se tenga autorización expresa**.
 - El **modo pasivo** (por defecto) solo realiza las peticiones que haría un navegador al visitar la URL.
