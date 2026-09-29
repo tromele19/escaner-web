@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  calidad:
+    name: Pruebas y análisis (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Instalar dependencias
+        run: pip install -e ".[dev]"
+      - name: Ruff (análisis estático)
+        run: ruff check .
+      - name: Bandit (seguridad del código)
+        run: bandit -q -r escaner -c pyproject.toml
+      - name: Pytest con cobertura
+        run: pytest --cov=escaner --cov-report=term-missing
+      - name: pip-audit (dependencias)
+        if: runner.os == 'Linux'
+        run: pip-audit --skip-editable

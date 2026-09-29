@@ -18,3 +18,4 @@ Regla: **no se integra código que no se entienda completamente**; si una parte 
 | Fecha | Herramienta | Tarea | Ficheros | Revisión realizada |
 |---|---|---|---|---|
 | 29/09/2026 | Agente de programación | Esqueleto inicial del repositorio: estructura de capas, `pyproject.toml`, README, modelos de datos, interfaz de los motores y CLI mínima | Estructura completa, `escaner/models.py`, `escaner/engines/base.py`, `escaner/cli.py`, `tests/unit/test_models.py` | Revisión de la estructura frente al apartado 8.3 de la memoria; comprobación de que `pytest` y `ruff` pasan |
+| 29/09/2026 | Agente de programación | Integración continua (pruebas, ruff, bandit y pip-audit en Linux y Windows) y plantillas de issue y pull request | `.github/workflows/ci.yml`, `.github/ISSUE_TEMPLATE/tarea.md`, `.github/pull_request_template.md` | Revisión de los pasos frente al apartado 6.2 de la memoria |
