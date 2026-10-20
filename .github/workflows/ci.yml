@@ -10,17 +10,18 @@ permissions:
 
 jobs:
   calidad:
-    name: Pruebas y análisis (${{ matrix.os }})
+    name: Pruebas (${{ matrix.os }}, Python ${{ matrix.python }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
+        python: ["3.11", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python }}
           cache: pip
       - name: Instalar dependencias
         run: |
@@ -33,5 +34,5 @@ jobs:
       - name: Pytest con cobertura
         run: pytest --cov=escaner --cov-report=term-missing
       - name: pip-audit (dependencias)
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && matrix.python == '3.14'
         run: pip-audit --skip-editable
