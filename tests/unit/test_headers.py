@@ -186,8 +186,15 @@ def test_referrer_policy_varias_valores_usa_el_ultimo():
 
 def test_x_xss_protection_activada_y_desactivada():
     assert "XXSS_ENABLED" in ids(with_(X_XSS_Protection="1; mode=block"))
+    # Valor recomendado por OWASP: no debe generar ningún hallazgo (falso positivo
+    # detectado al probar contra github.com).
     found = ids(with_(X_XSS_Protection="0"))
-    assert "XXSS_ENABLED" not in found and "OBSOLETE_HEADER" in found
+    assert not found & {"XXSS_ENABLED", "OBSOLETE_HEADER"}
+
+
+def test_cabeceras_obsoletas_expect_ct_y_hpkp():
+    found = ids(with_(Expect_CT="max-age=86400", Public_Key_Pins='pin-sha256="x"; max-age=1'))
+    assert "OBSOLETE_HEADER" in found
 
 
 def test_cabeceras_de_aislamiento_suman():

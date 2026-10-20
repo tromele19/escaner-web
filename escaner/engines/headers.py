@@ -151,11 +151,9 @@ def check_referrer_policy(value: str | None) -> list[Finding]:
 def check_obsolete(headers: dict[str, str]) -> list[Finding]:
     found = []
     xxss = headers.get("x-xss-protection")
-    if xxss is not None:
-        if xxss.startswith("1"):
-            found.append(finding("XXSS_ENABLED", f"x-xss-protection: {xxss}"))
-        else:
-            found.append(finding("OBSOLETE_HEADER", f"x-xss-protection: {xxss}"))
+    # OWASP recomienda "0" (desactivar el filtro antiguo): solo se avisa si está activado.
+    if xxss is not None and xxss.startswith("1"):
+        found.append(finding("XXSS_ENABLED", f"x-xss-protection: {xxss}"))
     for name in OBSOLETE:
         if name in headers:
             found.append(finding("OBSOLETE_HEADER", name))
