@@ -43,6 +43,10 @@ def register(*rules: Rule) -> None:
 def finding(rule_id: str, evidence: str = "") -> Finding:
     """Crea un ``Finding`` a partir de una regla del catálogo."""
     rule = RULES[rule_id]  # KeyError si el motor usa una regla inexistente
+    # La evidencia sale del sitio analizado (dato no confiable): se quitan los
+    # caracteres de control para que no puedan inyectar secuencias de escape en
+    # la terminal ni romper el informe.
+    evidence = "".join(ch if ch.isprintable() else " " for ch in evidence)
     evidence = " ".join(evidence.split())
     if len(evidence) > MAX_EVIDENCE:
         evidence = evidence[: MAX_EVIDENCE - 1] + "…"

@@ -1,0 +1,64 @@
+{
+  "schema_version": "1",
+  "tool": "escaner-web 0.1.0",
+  "rubric_version": "1.0",
+  "target": "https://www.u-tad.com/",
+  "final_url": "https://u-tad.com/",
+  "status_code": 200,
+  "mode": "pasivo",
+  "scanned_at": "2026-10-20T13:50:22.148947+00:00",
+  "redirects": [
+    "https://www.u-tad.com/"
+  ],
+  "grade": "C",
+  "global_score": 75.0,
+  "categories": {
+    "tls": null,
+    "cabeceras": {
+      "score": 75,
+      "weight": 20
+    },
+    "cookies": null,
+    "tecnologias": null,
+    "rutas": null,
+    "contenido": null
+  },
+  "findings": [
+    {
+      "category": "cabeceras",
+      "rule_id": "CSP_MISSING",
+      "severity": "media",
+      "title": "Falta la cabecera Content-Security-Policy",
+      "evidence": "",
+      "reference": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy",
+      "bonus": 0
+    },
+    {
+      "category": "cabeceras",
+      "rule_id": "REFERRER_POLICY_MISSING",
+      "severity": "baja",
+      "title": "Falta la cabecera Referrer-Policy",
+      "evidence": "",
+      "reference": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Referrer-Policy",
+      "bonus": 0
+    },
+    {
+      "category": "cabeceras",
+      "rule_id": "PERMISSIONS_POLICY_MISSING",
+      "severity": "baja",
+      "title": "Falta la cabecera Permissions-Policy",
+      "evidence": "",
+      "reference": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Permissions-Policy",
+      "bonus": 0
+    },
+    {
+      "category": "cabeceras",
+      "rule_id": "XXSS_ENABLED",
+      "severity": "baja",
+      "title": "X-XSS-Protection activada: obsoleta y puede introducir fallos (usar 0 o quitarla)",
+      "evidence": "x-xss-protection: 1; mode=block",
+      "reference": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-XSS-Protection",
+      "bonus": 0
+    }
+  ]
+}
