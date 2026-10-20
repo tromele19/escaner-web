@@ -25,6 +25,14 @@ class Engine(ABC):
         """Indica si el motor debe ejecutarse para este contexto."""
         return context.mode in self.modes
 
+    def is_evaluable(self, context: ScanContext) -> bool:
+        """Indica si la categoría se puede evaluar en este sitio.
+
+        Si no lo es (p. ej. un sitio que no usa cookies) la categoría aparece
+        como «No aplica» y no cuenta en la nota global.
+        """
+        return True
+
     @abstractmethod
     def analyze(self, context: ScanContext) -> list[Finding]:
         """Analiza el contexto y devuelve la lista de hallazgos."""
