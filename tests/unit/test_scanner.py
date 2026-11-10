@@ -43,9 +43,23 @@ def make_fetcher(headers=None, cookies=(), tls_verified=True, error=None):
     return fetcher
 
 
+def fake_prober():
+    calls = []
+
+    def prober(base_url, paths, **kw):
+        calls.append((base_url, list(paths), kw))
+        return {
+            "__soft404__": {"status": 404, "content_type": "text/html", "length": 10, "body": "no"}
+        }
+
+    prober.calls = calls
+    return prober
+
+
 def scan(url="http://ejemplo.es", **kwargs):
     kwargs.setdefault("fetcher", make_fetcher())
     kwargs.setdefault("tls_inspector", fake_inspector())
+    kwargs.setdefault("prober", fake_prober())
     return run_scan(url, resolver=resolver, **kwargs)
 
 
@@ -153,3 +167,20 @@ def test_url_https_comprueba_tambien_la_version_http():
     r = scan("https://ejemplo.es", fetcher=fetcher)
     assert [c[0].url for c in fetcher.calls] == ["https://ejemplo.es/", "http://ejemplo.es/"]
     assert r.context.tls_info["http_redirects_to_https"] is True
+
+
+# --- Modo completo --------------------------------------------------------
+
+
+def test_modo_pasivo_no_pide_ninguna_ruta():
+    prober = fake_prober()
+    r = scan(prober=prober)
+    assert prober.calls == []
+    assert Category.PATHS not in r.evaluated_categories
+
+
+def test_modo_completo_sondea_el_origen_final():
+    prober = fake_prober()
+    r = scan(mode=ScanMode.FULL, prober=prober)
+    assert prober.calls[0][0] == "https://ejemplo.es/"
+    assert Category.PATHS in r.evaluated_categories

@@ -94,6 +94,8 @@ class ScanContext:
     raw_set_cookies: list[str] = field(default_factory=list)
     html: str | None = None
     tls_info: dict[str, object] | None = None
+    # Solo en modo completo: resultado de pedir las rutas sensibles (ruta -> datos)
+    path_probes: dict[str, dict] | None = None
     started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
