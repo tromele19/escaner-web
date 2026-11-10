@@ -48,6 +48,8 @@ def make_ca():
         .not_valid_before(NOW - timedelta(days=1))
         .not_valid_after(NOW + timedelta(days=825))
         .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
+        # Identificadores de clave: obligatorios en la verificación estricta de Python 3.13+
+        .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), False)
         .add_extension(
             x509.KeyUsage(False, False, False, False, False, True, True, False, False),
             critical=True,
@@ -71,6 +73,10 @@ def make_leaf(name, hosts, ca_key, ca_cert, not_before, not_after):
         .add_extension(x509.SubjectAlternativeName([x509.DNSName(h) for h in hosts]), False)
         .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]), False)
         .add_extension(x509.BasicConstraints(ca=False, path_length=None), True)
+        .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), False)
+        .add_extension(
+            x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()), False
+        )
         .sign(ca_key, hashes.SHA256())
     )
     save(name, key, cert)
