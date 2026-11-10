@@ -32,8 +32,8 @@ reports/
 exports/
 
 # Laboratorio: claves privadas de los certificados de prueba
-lab/certs/*.key
-lab/certs/*.pem
+lab/certs/*
+!lab/certs/.gitkeep
 
 # IDE / SO
 .vscode/

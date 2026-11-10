@@ -238,4 +238,13 @@ def test_certificado_no_valido_se_reintenta_y_se_marca():
     session = FakeSession(routes, ssl_error_urls={"https://ejemplo.es/"})
     r, _ = run("https://ejemplo.es", routes, session=session)
     assert r.tls_verified is False
-    assert [verify for _, verify, _ in session.calls] == [True, False]
+    assert [verify is not False for _, verify, _ in session.calls] == [True, False]
+
+
+def test_usa_el_almacen_de_confianza_del_sistema(monkeypatch):
+    import escaner.acquisition.fetcher as fetcher_mod
+
+    monkeypatch.setattr(fetcher_mod, "system_ca_bundle", lambda: "/etc/ssl/certs/ca.pem")
+    routes = {"https://ejemplo.es/": FakeResponse(200, HTML, b"ok")}
+    _, session = run("https://ejemplo.es", routes)
+    assert session.calls[0][1] == "/etc/ssl/certs/ca.pem"
