@@ -18,6 +18,9 @@ from escaner.models import Category, Finding, ScanContext
 from escaner.rules import finding
 
 EXPIRY_WARNING = timedelta(days=30)
+# Códigos de OpenSSL que ya cubren otras reglas: 9 aún no válido, 10 caducado,
+# 62 el nombre no coincide.
+EXPLAINED_CODES = {9, 10, 62}
 MIN_KEY_BITS = {"RSA": 2048, "DSA": 2048, "EC": 256}
 WEAK_HASHES = {"sha1", "md5"}
 
@@ -66,11 +69,16 @@ def check_certificate(server: dict, now: datetime) -> list[Finding]:
     elif not_after - now < EXPIRY_WARNING:
         found.append(finding("TLS_CERT_EXPIRING_SOON", f"caduca el {not_after:%d/%m/%Y}"))
 
-    # La caducidad la evaluamos nosotros; aquí solo interesa la confianza en la cadena.
-    if not server.get("trusted") and (
-        cert.get("self_signed") or server.get("verify_code") in UNTRUSTED_CODES
-    ):
-        detail = "autofirmado" if cert.get("self_signed") else f"emisor: {issuer}"
+    # Si la verificación falla por un motivo que no explican la caducidad ni el
+    # nombre (que se evalúan aparte), el certificado se marca como no confiable.
+    # Nunca se ignora un error de verificación desconocido.
+    if not server.get("trusted") and server.get("verify_code") not in EXPLAINED_CODES:
+        if cert.get("self_signed"):
+            detail = "autofirmado"
+        elif server.get("verify_code") in UNTRUSTED_CODES:
+            detail = f"emisor no reconocido: {issuer}"
+        else:
+            detail = server.get("verify_error") or "error de verificación desconocido"
         found.append(finding("TLS_CERT_UNTRUSTED", detail))
 
     names = cert.get("san_dns") or ([cert["subject_cn"].lower()] if cert.get("subject_cn") else [])

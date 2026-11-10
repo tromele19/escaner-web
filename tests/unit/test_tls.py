@@ -115,6 +115,25 @@ def test_caducado_no_se_cuenta_ademas_como_no_confiable():
     assert "TLS_CERT_EXPIRED" in found and "TLS_CERT_UNTRUSTED" not in found
 
 
+def test_error_de_verificacion_desconocido_no_se_ignora():
+    # Caso real del laboratorio: Python 3.13+ rechaza un certificado sin
+    # Authority Key Identifier (código 85) aunque la CA sea de confianza.
+    s = server_dict()
+    s["trusted"] = False
+    s["verify_code"] = 85
+    s["verify_error"] = "Missing Authority Key Identifier"
+    (f,) = [f for f in analyze(s) if f.rule_id == "TLS_CERT_UNTRUSTED"]
+    assert "Authority Key Identifier" in f.evidence
+
+
+def test_nombre_que_no_coincide_no_se_cuenta_ademas_como_no_confiable():
+    s = server_dict(san_dns=["otro-sitio.es"], subject_cn="otro-sitio.es")
+    s["trusted"] = False
+    s["verify_code"] = 62
+    found = ids(s)
+    assert "TLS_CERT_HOSTNAME_MISMATCH" in found and "TLS_CERT_UNTRUSTED" not in found
+
+
 def test_nombre_del_certificado_no_coincide():
     s = server_dict(san_dns=["otro-sitio.es"], subject_cn="otro-sitio.es")
     assert "TLS_CERT_HOSTNAME_MISMATCH" in ids(s)
