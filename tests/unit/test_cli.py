@@ -26,7 +26,14 @@ def _fake_result():
             target.url, target.url, 200, {"X-Frame-Options": "[bold red]inyeccion[/]"}, ["sid=x"]
         )
 
-    return run_scan("https://ejemplo.es", fetcher=fetcher, resolver=lambda h, p: ["93.184.216.34"])
+    from tests.unit.tls_fakes import fake_inspector
+
+    return run_scan(
+        "https://ejemplo.es",
+        fetcher=fetcher,
+        resolver=lambda h, p: ["93.184.216.34"],
+        tls_inspector=fake_inspector(),
+    )
 
 
 def test_scan_muestra_nota_y_hallazgos(monkeypatch, tmp_path):
@@ -39,7 +46,7 @@ def test_scan_muestra_nota_y_hallazgos(monkeypatch, tmp_path):
     result = runner.invoke(app, ["scan", "https://ejemplo.es", "--json", str(out)])
     assert result.exit_code == 0, result.stdout
     assert "Nota global" in result.stdout
-    assert "No aplica" in result.stdout  # TLS, rutas... aún no evaluadas
+    assert "No aplica" in result.stdout  # rutas, contenido... aún no evaluadas
     assert "[bold red]inyeccion[/]" in result.stdout  # se muestra literal, sin interpretar
     assert json.loads(out.read_text())["grade"] in list("ABCDEF")
 

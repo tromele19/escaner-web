@@ -112,3 +112,10 @@ def test_es_determinista():
         b.grade,
         b.category_scores,
     )
+
+
+def test_sin_https_valido_la_nota_es_f():
+    findings = [Finding(Category.TLS, "TLS_CERT_EXPIRED", Severity.CRITICAL, "caducado")]
+    r = score_result(result(findings, set(WEIGHTS)))
+    assert r.global_score == 49
+    assert r.grade == "F"
