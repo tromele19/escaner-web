@@ -67,7 +67,12 @@ def test_flujo_completo_rellena_contexto_hallazgos_y_nota():
     r = scan(fetcher=make_fetcher(cookies=["PHPSESSID=x"]))
     assert r.context.final_url == "https://ejemplo.es/"
     assert r.context.redirect_chain == ["http://ejemplo.es/"]
-    assert r.evaluated_categories == {Category.TLS, Category.HEADERS, Category.COOKIES}
+    assert r.evaluated_categories == {
+        Category.TLS,
+        Category.HEADERS,
+        Category.COOKIES,
+        Category.CONTENT,
+    }
     assert "HSTS_MISSING" in {f.rule_id for f in r.findings}
     assert "SESSION_COOKIE_NO_SECURE" in {f.rule_id for f in r.findings}
     assert r.grade is not None and 0 <= r.global_score <= 100

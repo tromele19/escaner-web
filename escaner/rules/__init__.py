@@ -62,6 +62,7 @@ def finding(rule_id: str, evidence: str = "") -> Finding:
 
 
 # Importar los módulos de reglas los registra en RULES.
+from escaner.rules import content as _content  # noqa: E402,F401
 from escaner.rules import cookies as _cookies  # noqa: E402,F401
 from escaner.rules import headers as _headers  # noqa: E402,F401
 from escaner.rules import paths as _paths  # noqa: E402,F401
