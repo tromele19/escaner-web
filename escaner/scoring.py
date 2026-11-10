@@ -7,7 +7,9 @@ Rúbrica (apartado 8.5 de la memoria):
 - La nota global es la media ponderada de las categorías **evaluables**; las
   que no aplican (p. ej. cookies en un sitio sin cookies, o rutas sensibles en
   modo pasivo) no cuentan y su peso se reparte entre el resto.
-- Reglas de límite: con algún hallazgo crítico la nota no puede ser mejor que D.
+- Reglas de límite: con algún hallazgo crítico la nota no puede ser mejor que D,
+  y sin un HTTPS válido (no disponible, certificado caducado, no confiable o de
+  otro dominio) la nota es F.
 
 El cálculo es determinista: misma entrada, misma nota (RF-09).
 """
@@ -18,6 +20,7 @@ from collections.abc import Iterable
 
 from escaner.models import Category, Finding, ScanResult, Severity
 from escaner.rules import RUBRIC_VERSION
+from escaner.rules.tls import FAIL_GRADE_RULES
 
 WEIGHTS: dict[Category, int] = {
     Category.TLS: 25,
@@ -31,6 +34,7 @@ WEIGHTS: dict[Category, int] = {
 GRADES: list[tuple[int, str]] = [(90, "A"), (80, "B"), (70, "C"), (60, "D"), (50, "E"), (0, "F")]
 
 CRITICAL_CAP = 69  # con un hallazgo crítico, como mucho D
+NO_VALID_HTTPS_CAP = 49  # sin HTTPS válido, F (tabla 14 de la memoria)
 
 
 def category_score(findings: Iterable[Finding]) -> int:
@@ -65,6 +69,8 @@ def score_result(result: ScanResult) -> ScanResult:
     weighted = sum(result.category_scores[c] * WEIGHTS[c] for c in evaluated) / total_weight
     if any(f.severity is Severity.CRITICAL for f in result.findings):
         weighted = min(weighted, CRITICAL_CAP)
+    if any(f.rule_id in FAIL_GRADE_RULES for f in result.findings):
+        weighted = min(weighted, NO_VALID_HTTPS_CAP)
 
     result.global_score = round(weighted, 1)
     result.grade = grade_for(result.global_score)

@@ -7,21 +7,25 @@ validación del objetivo → adquisición → motores de análisis → puntuaci�
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from urllib.parse import urlsplit
 
-from escaner.acquisition.fetcher import FetchResult, fetch
+from escaner.acquisition.fetcher import FetchError, FetchResult, fetch
+from escaner.acquisition.tls_client import TLSError, TLSInfo, inspect_tls
 from escaner.engines.base import Engine
 from escaner.engines.cookies import CookiesEngine
 from escaner.engines.headers import HeadersEngine
+from escaner.engines.tls import TLSEngine
 from escaner.models import ScanContext, ScanMode, ScanResult
 from escaner.scoring import score_result
 from escaner.validator import Resolver, Target, system_resolver, validate_target
 
 Fetcher = Callable[..., FetchResult]
+TLSInspector = Callable[[str, int], TLSInfo]
 
 
 def default_engines() -> list[Engine]:
-    """Motores disponibles. Se irán añadiendo TLS, rutas, contenido y tecnologías."""
-    return [HeadersEngine(), CookiesEngine()]
+    """Motores disponibles. Se irán añadiendo rutas, contenido y tecnologías."""
+    return [TLSEngine(), HeadersEngine(), CookiesEngine()]
 
 
 def run_scan(
@@ -32,6 +36,7 @@ def run_scan(
     engines: Sequence[Engine] | None = None,
     fetcher: Fetcher = fetch,
     resolver: Resolver = system_resolver,
+    tls_inspector: TLSInspector = inspect_tls,
 ) -> ScanResult:
     """Ejecuta un escaneo completo y devuelve el resultado ya puntuado.
 
@@ -50,7 +55,9 @@ def run_scan(
         headers=response.headers,
         raw_set_cookies=response.set_cookies,
         html=response.html,
-        tls_info={"verified": response.tls_verified},
+        tls_info=collect_tls_info(
+            target, response, allow_private, fetcher, resolver, tls_inspector
+        ),
     )
 
     result = ScanResult(context=context)
@@ -60,3 +67,46 @@ def run_scan(
         result.evaluated_categories.add(engine.category)
         result.findings.extend(engine.analyze(context))
     return score_result(result)
+
+
+def collect_tls_info(
+    target: Target,
+    response: FetchResult,
+    allow_private: bool,
+    fetcher: Fetcher,
+    resolver: Resolver,
+    tls_inspector: TLSInspector,
+) -> dict:
+    """Reúne lo que necesita el motor de TLS (solo peticiones normales, modo pasivo)."""
+    final = urlsplit(response.final_url)
+    info: dict = {"verified": response.tls_verified}
+
+    # Se inspecciona el host final si es HTTPS (p. ej. tras redirigir a www.);
+    # si no, el host original en el puerto 443.
+    if final.scheme == "https":
+        host, port = final.hostname or target.host, final.port or 443
+    else:
+        host, port = target.host, 443
+    try:
+        info["server"] = tls_inspector(host, port).to_dict()
+        info["https_available"] = True
+    except TLSError as exc:
+        info["https_available"] = False
+        info["error"] = str(exc)[:200]
+        return info
+
+    if target.scheme == "http":
+        # El usuario pidió la versión HTTP: basta con ver adónde acabó.
+        info["http_redirects_to_https"] = final.scheme == "https"
+    else:
+        info["final_url_https"] = final.scheme == "https"
+        # Se comprueba si la versión HTTP redirige a HTTPS (una petición más).
+        try:
+            http_target = validate_target(
+                f"http://{target.host}/", allow_private=allow_private, resolver=resolver
+            )
+            http_resp = fetcher(http_target, allow_private=allow_private, resolver=resolver)
+            info["http_redirects_to_https"] = http_resp.final_url.startswith("https://")
+        except (FetchError, ValueError):
+            info["http_redirects_to_https"] = None  # sin puerto 80 o no comprobable
+    return info

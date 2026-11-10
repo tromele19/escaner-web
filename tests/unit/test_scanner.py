@@ -10,6 +10,7 @@ from escaner.reporting.json_report import to_dict, to_json
 from escaner.rules import finding
 from escaner.scanner import run_scan
 from escaner.validator import TargetError
+from tests.unit.tls_fakes import fake_inspector
 
 DNS = {"ejemplo.es": ["93.184.216.34"], "interno.es": ["10.0.0.1"]}
 
@@ -44,6 +45,7 @@ def make_fetcher(headers=None, cookies=(), tls_verified=True, error=None):
 
 def scan(url="http://ejemplo.es", **kwargs):
     kwargs.setdefault("fetcher", make_fetcher())
+    kwargs.setdefault("tls_inspector", fake_inspector())
     return run_scan(url, resolver=resolver, **kwargs)
 
 
@@ -51,7 +53,7 @@ def test_flujo_completo_rellena_contexto_hallazgos_y_nota():
     r = scan(fetcher=make_fetcher(cookies=["PHPSESSID=x"]))
     assert r.context.final_url == "https://ejemplo.es/"
     assert r.context.redirect_chain == ["http://ejemplo.es/"]
-    assert r.evaluated_categories == {Category.HEADERS, Category.COOKIES}
+    assert r.evaluated_categories == {Category.TLS, Category.HEADERS, Category.COOKIES}
     assert "HSTS_MISSING" in {f.rule_id for f in r.findings}
     assert "SESSION_COOKIE_NO_SECURE" in {f.rule_id for f in r.findings}
     assert r.grade is not None and 0 <= r.global_score <= 100
@@ -83,7 +85,7 @@ def test_error_de_descarga_se_propaga():
 
 def test_certificado_no_valido_queda_en_el_contexto():
     r = scan(fetcher=make_fetcher(tls_verified=False))
-    assert r.context.tls_info == {"verified": False}
+    assert r.context.tls_info["verified"] is False
 
 
 def test_modo_se_guarda_en_el_contexto():
@@ -98,7 +100,8 @@ def test_json_valido_y_sin_datos_en_bruto():
     data = json.loads(to_json(r))
     assert data["grade"] == r.grade
     assert data["categories"]["cookies"]["weight"] == 15
-    assert data["categories"]["tls"] is None  # no evaluada
+    assert data["categories"]["tls"]["weight"] == 25
+    assert data["categories"]["rutas"] is None  # no evaluada en modo pasivo
     assert "VALOR_SECRETO" not in to_json(r)
     assert "<html>" not in to_json(r)
 
@@ -122,3 +125,31 @@ def test_json_tiene_todos_los_campos_de_hallazgo():
 def test_evidencia_sin_caracteres_de_control():
     f = finding("XFO_INVALID", "ALLOW\x1b[31m-FROM\x00\r\nX")
     assert "\x1b" not in f.evidence and "\x00" not in f.evidence and "\n" not in f.evidence
+
+
+# --- Integración del TLS ------------------------------------------------
+
+
+def test_sitio_sin_https_da_f():
+    r = scan(tls_inspector=fake_inspector(error="Connection refused"))
+    assert "TLS_NO_HTTPS" in {f.rule_id for f in r.findings}
+    assert r.grade == "F"
+
+
+def test_se_inspecciona_el_host_final_si_es_https():
+    inspector = fake_inspector()
+    scan(tls_inspector=inspector)
+    assert inspector.calls == [("ejemplo.es", 443)]
+
+
+def test_url_http_que_redirige_a_https_no_penaliza():
+    r = scan("http://ejemplo.es")
+    assert r.context.tls_info["http_redirects_to_https"] is True
+    assert "TLS_NO_HTTPS_REDIRECT" not in {f.rule_id for f in r.findings}
+
+
+def test_url_https_comprueba_tambien_la_version_http():
+    fetcher = make_fetcher()
+    r = scan("https://ejemplo.es", fetcher=fetcher)
+    assert [c[0].url for c in fetcher.calls] == ["https://ejemplo.es/", "http://ejemplo.es/"]
+    assert r.context.tls_info["http_redirects_to_https"] is True
