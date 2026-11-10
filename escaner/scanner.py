@@ -10,22 +10,26 @@ from collections.abc import Callable, Sequence
 from urllib.parse import urlsplit
 
 from escaner.acquisition.fetcher import FetchError, FetchResult, fetch
+from escaner.acquisition.prober import probe_paths
 from escaner.acquisition.tls_client import TLSError, TLSInfo, inspect_tls
 from escaner.engines.base import Engine
 from escaner.engines.cookies import CookiesEngine
 from escaner.engines.headers import HeadersEngine
+from escaner.engines.paths import PathsEngine
 from escaner.engines.tls import TLSEngine
 from escaner.models import ScanContext, ScanMode, ScanResult
+from escaner.rules.paths import ALL_PATHS
 from escaner.scoring import score_result
 from escaner.validator import Resolver, Target, system_resolver, validate_target
 
 Fetcher = Callable[..., FetchResult]
 TLSInspector = Callable[[str, int], TLSInfo]
+Prober = Callable[..., dict]
 
 
 def default_engines() -> list[Engine]:
-    """Motores disponibles. Se irán añadiendo rutas, contenido y tecnologías."""
-    return [TLSEngine(), HeadersEngine(), CookiesEngine()]
+    """Motores disponibles. Se irán añadiendo contenido y tecnologías."""
+    return [TLSEngine(), HeadersEngine(), CookiesEngine(), PathsEngine()]
 
 
 def run_scan(
@@ -37,6 +41,7 @@ def run_scan(
     fetcher: Fetcher = fetch,
     resolver: Resolver = system_resolver,
     tls_inspector: TLSInspector = inspect_tls,
+    prober: Prober = probe_paths,
 ) -> ScanResult:
     """Ejecuta un escaneo completo y devuelve el resultado ya puntuado.
 
@@ -59,6 +64,13 @@ def run_scan(
             target, response, allow_private, fetcher, resolver, tls_inspector
         ),
     )
+
+    if mode is ScanMode.FULL:
+        # Solo en modo completo (con autorización confirmada): rutas sensibles
+        # en el mismo origen que la URL final, que ya ha pasado el validador.
+        context.path_probes = prober(
+            response.final_url, ALL_PATHS, verify_tls=response.tls_verified
+        )
 
     result = ScanResult(context=context)
     for engine in engines if engines is not None else default_engines():
