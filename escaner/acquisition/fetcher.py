@@ -131,6 +131,13 @@ def fetch(
             session.close()
 
 
+SYSTEM_CA_FILES = (
+    "/etc/ssl/certs/ca-certificates.crt",  # Debian, Ubuntu, Kali
+    "/etc/pki/tls/certs/ca-bundle.crt",  # Fedora, RHEL
+    "/etc/ssl/cert.pem",  # macOS, Alpine
+)
+
+
 def system_ca_bundle() -> str | bool:
     """Almacén de autoridades de confianza del sistema, si existe.
 
@@ -139,8 +146,13 @@ def system_ca_bundle() -> str | bool:
     certificado se usa la del sistema también aquí. Si no se encuentra (p. ej.
     en Windows), se deja el comportamiento por defecto de ``requests``.
     """
-    cafile = ssl.get_default_verify_paths().cafile
-    return cafile if cafile and os.path.exists(cafile) else True
+    paths = ssl.get_default_verify_paths()
+    for candidate in (paths.cafile, paths.openssl_cafile, *SYSTEM_CA_FILES):
+        if candidate and os.path.isfile(candidate):
+            return candidate
+    if paths.capath and os.path.isdir(paths.capath):
+        return paths.capath
+    return True
 
 
 def _get(session: requests.Session, url: str, timeout: float) -> tuple[requests.Response, bool]:
