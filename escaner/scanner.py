@@ -13,6 +13,7 @@ from escaner.acquisition.fetcher import FetchError, FetchResult, fetch
 from escaner.acquisition.prober import probe_paths
 from escaner.acquisition.tls_client import TLSError, TLSInfo, inspect_tls
 from escaner.engines.base import Engine
+from escaner.engines.content import ContentEngine
 from escaner.engines.cookies import CookiesEngine
 from escaner.engines.headers import HeadersEngine
 from escaner.engines.paths import PathsEngine
@@ -28,8 +29,8 @@ Prober = Callable[..., dict]
 
 
 def default_engines() -> list[Engine]:
-    """Motores disponibles. Se irán añadiendo contenido y tecnologías."""
-    return [TLSEngine(), HeadersEngine(), CookiesEngine(), PathsEngine()]
+    """Motores disponibles. Falta el de tecnologías y CVE."""
+    return [TLSEngine(), HeadersEngine(), CookiesEngine(), PathsEngine(), ContentEngine()]
 
 
 def run_scan(
