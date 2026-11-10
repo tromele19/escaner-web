@@ -19,6 +19,8 @@ Decisiones de seguridad:
 
 from __future__ import annotations
 
+import os
+import ssl
 import warnings
 from dataclasses import dataclass, field
 from urllib.parse import urljoin
@@ -129,11 +131,35 @@ def fetch(
             session.close()
 
 
+SYSTEM_CA_FILES = (
+    "/etc/ssl/certs/ca-certificates.crt",  # Debian, Ubuntu, Kali
+    "/etc/pki/tls/certs/ca-bundle.crt",  # Fedora, RHEL
+    "/etc/ssl/cert.pem",  # macOS, Alpine
+)
+
+
+def system_ca_bundle() -> str | bool:
+    """Almacén de autoridades de confianza del sistema, si existe.
+
+    ``requests`` usa por defecto su propia lista (certifi), mientras que el
+    cliente TLS usa la del sistema. Para que los dos opinen lo mismo sobre un
+    certificado se usa la del sistema también aquí. Si no se encuentra (p. ej.
+    en Windows), se deja el comportamiento por defecto de ``requests``.
+    """
+    paths = ssl.get_default_verify_paths()
+    for candidate in (paths.cafile, paths.openssl_cafile, *SYSTEM_CA_FILES):
+        if candidate and os.path.isfile(candidate):
+            return candidate
+    if paths.capath and os.path.isdir(paths.capath):
+        return paths.capath
+    return True
+
+
 def _get(session: requests.Session, url: str, timeout: float) -> tuple[requests.Response, bool]:
     """Hace la petición; si falla el certificado, la repite sin verificarlo."""
     kwargs = {"allow_redirects": False, "stream": True, "timeout": timeout}
     try:
-        return session.get(url, verify=True, **kwargs), True
+        return session.get(url, verify=system_ca_bundle(), **kwargs), True
     except requests.exceptions.SSLError:
         pass
     except requests.exceptions.Timeout as exc:

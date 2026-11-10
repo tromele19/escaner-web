@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>contenido.lab</title>
+  <!-- Script de terceros por HTTP: contenido mixto activo -->
+  <script src="http://cdn.ejemplo-lab.test/analitica.js"></script>
+  <!-- Script de terceros por HTTPS pero SIN integrity (SRI) -->
+  <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+  <!-- Hoja de estilos de terceros sin SRI -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.css">
+  <!-- Script de terceros CON integrity: correcto, no debe penalizar -->
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.13/dayjs.min.js"
+          integrity="sha384-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+          crossorigin="anonymous"></script>
+</head>
+<body>
+  <h1>Sitio con problemas de contenido</h1>
+  <!-- Imagen por HTTP: contenido mixto pasivo -->
+  <img src="http://cdn.ejemplo-lab.test/logo.png" alt="logo">
+  <!-- Formulario de login que envía la contraseña por HTTP -->
+  <form method="post" action="http://contenido.lab/login">
+    <input name="usuario"><input type="password" name="clave">
+    <button>Entrar</button>
+  </form>
+  <!-- Enlace a otra web en pestaña nueva sin rel="noopener" -->
+  <a href="https://ejemplo.org" target="_blank">Enlace externo</a>
+</body>
+</html>
