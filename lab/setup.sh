@@ -32,7 +32,9 @@ PY="$REPO_DIR/.venv/bin/python"; [[ -x "$PY" ]] || PY=python3
 
 echo "[3/7] Instalando la CA del laboratorio como autoridad de confianza de la Kali..."
 cp "$LAB_DIR/certs/lab-ca.crt" "$CA_SYS"
-update-ca-certificates >/dev/null
+# --fresh reconstruye el almacén entero: al reinstalar, la CA se regenera y
+# la anterior no debe quedarse en el almacén.
+update-ca-certificates --fresh >/dev/null 2>&1
 
 echo "[4/7] Copiando los sitios y sembrando ficheros sensibles en expuesto.lab..."
 rm -rf "$WWW"; mkdir -p "$WWW"
@@ -64,7 +66,8 @@ grep -q "correcto.lab inseguro.lab" /etc/hosts || echo "$HOSTS_LINE  # escaner-l
 echo "[7/7] Arrancando Nginx..."
 nginx -t
 systemctl enable --now nginx >/dev/null 2>&1 || true
-systemctl reload nginx || systemctl restart nginx
+systemctl restart nginx  # restart (no reload) para que cargue los certificados nuevos
+sleep 1
 
 echo
 echo "Comprobación rápida:"
