@@ -286,3 +286,32 @@ def test_tope_por_critico_se_explica():
         "hallazgos": [{"id": "GIT_REPO_EXPOSED", "severidad": "critica", "buena_practica": False}],
     }
     assert "crítico" in explain_score(data) and "69" in explain_score(data)
+
+
+def test_respuesta_real_de_qwen_sin_nota_ni_configuracion(tmp_path):
+    """Respuesta real de qwen2.5:3b contra inseguro.lab (15/11/2026): no trae
+    «nota_explicada» ni «configuracion» porque ya no se le piden."""
+    _, _, scan = stored_scan(tmp_path, {"TECH_VERSION_DISCLOSED": "nginx 1.18.0"})
+    real = {
+        "resumen": "El análisis de seguridad web del dominio ha mostrado varios problemas.",
+        "plan": [
+            {
+                "prioridad": 1,
+                "hallazgos": ["HSTS_MISSING"],
+                "accion": "Implementar HTTPS",
+                "por_que": "Evita ataques de redireccionamiento.",
+                "esfuerzo": "medio",
+            },
+            {
+                "prioridad": 2,
+                "hallazgos": ["TECH_VERSION_DISCLOSED"],
+                "accion": "Ocultar la versión",
+                "por_que": "Facilita ataques.",
+                "esfuerzo": "bajo",
+            },
+        ],
+    }
+    result = generate_report(sanitize(scan), FakeProvider(real))
+    assert result.attempts == 1 and result.discarded == []
+    assert "server_tokens off;" in result.report["plan"][1]["configuracion"]
+    assert result.report["nota_explicada"].startswith("Nota ")

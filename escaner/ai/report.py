@@ -69,7 +69,7 @@ def validate_report(raw: str, allowed: set[str]) -> tuple[dict | None, list[str]
         return None, ["la respuesta no es JSON"]
     if (
         not isinstance(data, dict)
-        or not all(isinstance(data.get(k), str) for k in ("resumen", "nota_explicada"))
+        or not isinstance(data.get("resumen"), str)
         or not isinstance(data.get("plan"), list)
     ):
         return None, ["la respuesta no tiene la estructura esperada"]
