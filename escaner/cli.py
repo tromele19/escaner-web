@@ -12,7 +12,7 @@ from rich.text import Text
 from escaner import __version__
 from escaner.acquisition.fetcher import FetchError
 from escaner.models import ScanMode, ScanResult, Severity
-from escaner.reporting.json_report import to_json
+from escaner.reporting.json_report import stored_to_json, to_json
 from escaner.scanner import run_scan
 from escaner.scoring import WEIGHTS
 from escaner.validator import TargetError
@@ -54,6 +54,7 @@ def scan(
     json_out: Path | None = typer.Option(
         None, "--json", help="Guarda el resultado en un fichero JSON.", dir_okay=False
     ),
+    save: bool = typer.Option(True, "--save/--no-save", help="Guardar en el histórico."),
     profile: str = typer.Option("divulgativo", help="Perfil del informe: tecnico o divulgativo."),
 ) -> None:
     """Analiza una URL y muestra la nota y los hallazgos."""
@@ -73,6 +74,14 @@ def scan(
         raise typer.Exit(code=1) from exc
 
     print_result(result)
+    if save:
+        from escaner.storage import Storage
+
+        scan_id = Storage().save(result)
+        console.print(
+            f"Escaneo guardado en el histórico con id [bold]{scan_id}[/bold] "
+            f"(escaner history {Text(result.context.target_url).plain})"
+        )
     if json_out is not None:
         json_out.write_text(to_json(result), encoding="utf-8")
         console.print(f"Resultado guardado en {json_out}")
@@ -162,27 +171,104 @@ def update_cve() -> None:
 
 
 @app.command()
-def history(domain: str = typer.Argument(..., help="Dominio.")) -> None:
+def history(
+    domain: str = typer.Argument(..., help="Dominio, p. ej. ejemplo.es."),
+    limit: int = typer.Option(20, help="Número máximo de escaneos."),
+) -> None:
     """Lista los escaneos guardados de un dominio."""
-    _not_implemented("history")
+    from escaner.storage import Storage
+
+    rows = Storage().history(domain, limit)
+    if not rows:
+        console.print(f"No hay escaneos guardados de {domain}.")
+        raise typer.Exit(code=1)
+    table = Table(title=f"Histórico de {domain}")
+    for col in ("Id", "Fecha (UTC)", "Modo", "Nota", "Graves"):
+        table.add_column(col, justify="right" if col in {"Id", "Nota", "Graves"} else "left")
+    for r in rows:
+        grade = r["grade"] or "-"
+        table.add_row(
+            str(r["id"]),
+            r["scanned_at"][:16].replace("T", " "),
+            r["mode"],
+            Text(
+                f"{grade} {r['global_score'] if r['global_score'] is not None else '-'}",
+                GRADE_STYLE.get(grade, "bold red"),
+            ),
+            str(r["serious"]),
+        )
+    console.print(table)
 
 
 @app.command()
 def compare(
     domain: str = typer.Argument(..., help="Dominio."),
-    last: int = typer.Option(2, help="Número de escaneos a comparar."),
+    old: int | None = typer.Option(None, "--old", help="Id del escaneo antiguo."),
+    new: int | None = typer.Option(None, "--new", help="Id del escaneo nuevo."),
 ) -> None:
-    """Compara escaneos de un dominio (hallazgos nuevos, resueltos y variación de nota)."""
-    _not_implemented("compare")
+    """Compara escaneos de un dominio: hallazgos nuevos, resueltos y variación de nota.
+
+    Sin --old/--new compara los dos últimos escaneos del dominio.
+    """
+    from escaner.storage import Storage
+
+    store = Storage()
+    try:
+        cmp = store.compare(old, new) if old and new else store.compare_last(domain)
+    except KeyError as exc:
+        console.print(Text(str(exc.args[0]), style="bold red"))
+        raise typer.Exit(code=1) from exc
+
+    delta = cmp.score_delta
+    arrow = "=" if not delta else ("▲" if delta > 0 else "▼")
+    style = "green" if delta and delta > 0 else "red" if delta and delta < 0 else "white"
+    console.print(
+        Text(
+            f"{cmp.domain}: escaneo {cmp.old['id']} ({cmp.old['grade']} {cmp.old['global_score']})"
+            f" → escaneo {cmp.new['id']} ({cmp.new['grade']} {cmp.new['global_score']})  "
+            f"{arrow} {delta if delta is not None else ''}",
+            style=f"bold {style}",
+        )
+    )
+    for title, items, colour in (
+        ("Resueltos", cmp.resolved, "green"),
+        ("Nuevos", cmp.new_findings, "red"),
+    ):
+        table = Table(title=f"{title} ({len(items)})", title_style=colour)
+        table.add_column("Severidad")
+        table.add_column("Categoría")
+        table.add_column("Hallazgo")
+        for f in sorted(items, key=lambda f: SEVERITY_ORDER.index(Severity(f["severity"]))):
+            table.add_row(
+                Text(f["severity"], SEVERITY_STYLE[Severity(f["severity"])]),
+                Text(f["category"]),
+                Text(f["title"]),
+            )
+        console.print(table)
+    console.print(f"Sin cambios: {len(cmp.unchanged)} hallazgos.")
 
 
 @app.command()
 def export(
-    scan_id: int = typer.Argument(..., help="Id del escaneo."),
-    format: str = typer.Option("json", "--format", help="pdf, html o json."),
+    scan_id: int = typer.Argument(..., help="Id del escaneo (ver «escaner history»)."),
+    format: str = typer.Option("json", "--format", help="json (html y pdf, próximamente)."),
+    output: Path | None = typer.Option(None, "--output", "-o", help="Fichero de salida."),
 ) -> None:
-    """Exporta el informe de un escaneo."""
-    _not_implemented("export")
+    """Exporta el resultado de un escaneo guardado."""
+    from escaner.storage import Storage
+
+    scan = Storage().get_scan(scan_id)
+    if scan is None:
+        console.print(Text(f"No existe el escaneo {scan_id}.", style="bold red"))
+        raise typer.Exit(code=1)
+    if format != "json":
+        _not_implemented(f"export --format {format}")
+    content = stored_to_json(scan)
+    if output is None:
+        print(content)
+    else:
+        output.write_text(content, encoding="utf-8")
+        console.print(f"Exportado a {output}")
 
 
 @app.command()
