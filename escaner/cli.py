@@ -271,13 +271,109 @@ def export(
         console.print(f"Exportado a {output}")
 
 
+def _load_scan(scan_id: int):
+    from escaner.storage import Storage
+
+    store = Storage()
+    scan = store.get_scan(scan_id)
+    if scan is None:
+        console.print(Text(f"No existe el escaneo {scan_id}.", style="bold red"))
+        raise typer.Exit(code=1)
+    return store, scan
+
+
+@app.command()
+def report(
+    scan_id: int = typer.Argument(..., help="Id del escaneo (ver «escaner history»)."),
+    profile: str = typer.Option("divulgativo", "--profile", "-p", help="tecnico o divulgativo."),
+    regenerate: bool = typer.Option(False, "--regenerate", help="Ignora el informe guardado."),
+) -> None:
+    """Genera con IA el informe explicativo y el plan de remediación priorizado.
+
+    La nota NO la decide la IA: solo explica el resultado técnico ya calculado.
+    """
+    from escaner.ai.providers import AIError, describe, get_provider
+    from escaner.ai.report import generate_report
+    from escaner.ai.sanitizer import sanitize
+
+    store, scan = _load_scan(scan_id)
+    if profile not in {"tecnico", "divulgativo"}:
+        console.print(Text("El perfil debe ser «tecnico» o «divulgativo».", style="bold red"))
+        raise typer.Exit(code=2)
+
+    saved = None if regenerate else store.get_report(scan_id, profile)
+    if saved:
+        print_ai_report(saved["content"], saved["model"])
+        return
+    try:
+        provider = get_provider()
+    except AIError as exc:
+        console.print(Text(str(exc), style="bold red"))
+        raise typer.Exit(code=1) from exc
+
+    with console.status(f"Generando informe con {describe(provider)}…"):
+        result = generate_report(sanitize(scan), provider, profile)
+    for problem in result.discarded:
+        console.print(Text(f"Descartado de la respuesta de la IA: {problem}", style="yellow"))
+    if result.report is None:
+        console.print(Text(f"No hay informe de IA: {result.error}", style="bold red"))
+        console.print(f"La nota y el informe técnico siguen disponibles: escaner export {scan_id}")
+        raise typer.Exit(code=1)
+    store.save_report(scan_id, profile, describe(provider), result.report)
+    print_ai_report(result.report, describe(provider))
+
+
+def print_ai_report(rep: dict, model: str) -> None:
+    console.print(
+        Text(f"Informe generado con IA ({model}). Revísalo antes de aplicar cambios.", style="dim")
+    )
+    console.print(Text("Resumen", style="bold"))
+    console.print(Text(rep["resumen"]))
+    console.print(Text("La nota", style="bold"))
+    console.print(Text(rep["nota_explicada"]))
+    for step in rep["plan"]:
+        console.print(
+            Text(
+                f"\n{step['prioridad']}. {step['accion']}  [esfuerzo {step['esfuerzo']}]",
+                style="bold cyan",
+            )
+        )
+        console.print(Text("   Hallazgos: " + ", ".join(step["hallazgos"]), style="dim"))
+        console.print(Text("   " + step["por_que"]))
+        if step["configuracion"]:
+            console.print(Text(step["configuracion"], style="green"))
+
+
 @app.command()
 def ask(
     scan_id: int = typer.Argument(..., help="Id del escaneo."),
     question: str = typer.Argument(..., help="Pregunta sobre el informe."),
+    profile: str = typer.Option("divulgativo", "--profile", "-p"),
 ) -> None:
-    """Pregunta sobre un informe ya generado."""
-    _not_implemented("ask")
+    """Pregunta sobre un escaneo y su informe (solo responde sobre ese informe)."""
+    from escaner.ai.ask import ask as ask_ai
+    from escaner.ai.providers import AIError, get_provider
+    from escaner.ai.sanitizer import sanitize
+
+    store, scan = _load_scan(scan_id)
+    saved = store.get_report(scan_id, profile)
+    try:
+        with console.status("Pensando…"):
+            answer = ask_ai(
+                sanitize(scan), saved["content"] if saved else None, question, get_provider()
+            )
+    except (AIError, ValueError) as exc:
+        console.print(Text(str(exc), style="bold red"))
+        raise typer.Exit(code=1) from exc
+    console.print(Text(answer["respuesta"]))
+    if answer["citas_no_validas"]:
+        console.print(
+            Text(
+                "Ojo: cita hallazgos que no están en este escaneo: "
+                + ", ".join(answer["citas_no_validas"]),
+                style="yellow",
+            )
+        )
 
 
 if __name__ == "__main__":
