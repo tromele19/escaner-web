@@ -55,3 +55,29 @@ def to_dict(result: ScanResult) -> dict[str, Any]:
 
 def to_json(result: ScanResult) -> str:
     return json.dumps(to_dict(result), ensure_ascii=False, indent=2)
+
+
+def stored_to_json(scan: dict) -> str:
+    """JSON de un escaneo guardado en el histórico (mismo esquema que ``to_dict``)."""
+    data = {
+        "schema_version": SCHEMA_VERSION,
+        "tool": f"escaner-web {scan['tool_version']}",
+        "rubric_version": scan["rubric_version"],
+        "scan_id": scan["id"],
+        "target": scan["url"],
+        "final_url": scan["final_url"],
+        "mode": scan["mode"],
+        "scanned_at": scan["scanned_at"],
+        "grade": scan["grade"],
+        "global_score": scan["global_score"],
+        "categories": {
+            str(cat): (
+                {"score": scan["category_scores"][str(cat)], "weight": WEIGHTS[cat]}
+                if str(cat) in scan["category_scores"]
+                else None
+            )
+            for cat in WEIGHTS
+        },
+        "findings": scan["findings"],
+    }
+    return json.dumps(data, ensure_ascii=False, indent=2)
