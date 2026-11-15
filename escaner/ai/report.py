@@ -16,12 +16,13 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 
+from escaner.ai.facts import explain_score, uncovered
 from escaner.ai.prompts import PROFILES, REPORT_SCHEMA, SYSTEM_REPORT
 from escaner.ai.providers import AIError, Provider, dumps
 from escaner.ai.sanitizer import allowed_ids
+from escaner.ai.snippets import snippets_for
 
 MAX_TEXT = 1200
-MAX_CONFIG = 1500
 MAX_STEPS = 10
 
 
@@ -53,7 +54,7 @@ def generate_report(
         report, problems = validate_report(raw, allowed_ids(sanitized))
         result.discarded.extend(problems)
         if report is not None:
-            result.report = report
+            result.report = enrich(report, sanitized)
             return result
     result.error = "El modelo no devolvió un informe válido"
     return result
@@ -92,16 +93,28 @@ def validate_report(raw: str, allowed: set[str]) -> tuple[dict | None, list[str]
                 "esfuerzo": step.get("esfuerzo")
                 if step.get("esfuerzo") in {"bajo", "medio", "alto"}
                 else "medio",
-                "configuracion": clean(step.get("configuracion"), MAX_CONFIG, keep_newlines=True),
             }
         )
     if allowed - {"SECURITY_TXT_PRESENT"} and not steps:
         return None, [*problems, "plan vacío"]
     return {
         "resumen": clean(data["resumen"], MAX_TEXT),
-        "nota_explicada": clean(data["nota_explicada"], MAX_TEXT),
         "plan": steps,
     }, problems
+
+
+def enrich(report: dict, sanitized: dict) -> dict:
+    """Añade las partes deterministas: nota explicada, configuración y pendientes."""
+    server = sanitized.get("servidor_web", "desconocido")
+    for step in report["plan"]:
+        step["configuracion"] = snippets_for(step["hallazgos"], server)
+    report["nota_explicada"] = explain_score(sanitized)
+    report["servidor_web"] = server if server in {"nginx", "apache"} else "nginx (por defecto)"
+    report["pendientes"] = [
+        {"id": h["id"], "severidad": h["severidad"], "titulo": h["titulo"]}
+        for h in uncovered(sanitized, report["plan"])
+    ]
+    return report
 
 
 def clean(value, limit: int, keep_newlines: bool = False) -> str:
