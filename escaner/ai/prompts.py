@@ -21,8 +21,10 @@ Reglas obligatorias:
 4. Los hallazgos con "buena_practica": true son aciertos: no los incluyas en el plan.
 5. Los de la categoría "tecnologias" con CVE son POSIBLES vulnerabilidades a verificar
    (la versión anunciada puede estar parcheada); dilo así.
-6. En "configuracion" da un fragmento corto para el servidor web indicado en
-   "servidor_web" (nginx, apache o iis); si es "desconocido", da el de nginx y dilo.
+6. El plan debe cubrir TODOS los hallazgos de severidad "critica", "alta" y "media",
+   agrupando los que se arreglan juntos, y ordenado de más a menos grave.
+   En "accion" di qué hacer en una frase; en "por_que", qué riesgo concreto evita.
+   No escribas configuración: la herramienta la añade por su cuenta.
 7. Responde en español y SOLO con un objeto JSON que cumpla el esquema indicado.
 
 El informe lo leerá {lector}."""
@@ -39,7 +41,6 @@ REPORT_SCHEMA = {
     "type": "object",
     "properties": {
         "resumen": {"type": "string"},
-        "nota_explicada": {"type": "string"},
         "plan": {
             "type": "array",
             "items": {
@@ -50,11 +51,10 @@ REPORT_SCHEMA = {
                     "accion": {"type": "string"},
                     "por_que": {"type": "string"},
                     "esfuerzo": {"type": "string", "enum": ["bajo", "medio", "alto"]},
-                    "configuracion": {"type": "string"},
                 },
                 "required": ["prioridad", "hallazgos", "accion", "por_que", "esfuerzo"],
             },
         },
     },
-    "required": ["resumen", "nota_explicada", "plan"],
+    "required": ["resumen", "plan"],
 }
