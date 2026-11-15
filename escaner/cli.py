@@ -139,6 +139,28 @@ def print_result(result: ScanResult) -> None:
     console.print(table)
 
 
+@app.command(name="update-cve")
+def update_cve() -> None:
+    """Descarga de NVD la base local de CVE (tarda unos minutos sin clave de API)."""
+    import requests
+
+    from escaner.cve.updater import default_db_path, update_database
+
+    path = default_db_path()
+    console.print(f"Descargando CVE de NVD en {path} (5 peticiones cada 30 s sin NVD_API_KEY)...")
+    try:
+        db = update_database(path, progress=lambda msg: console.print(f"  {msg}"))
+    except requests.exceptions.RequestException as exc:
+        console.print(Text(f"Error descargando de NVD: {exc}", style="bold red"))
+        raise typer.Exit(code=1) from exc
+    console.print(f"[green]Base de CVE actualizada:[/green] {path}")
+    if db.get("incomplete"):
+        console.print(
+            f"[yellow]Sin descargar (NVD no respondió):[/yellow] {', '.join(db['incomplete'])}. "
+            "Vuelve a ejecutar «escaner update-cve» más tarde."
+        )
+
+
 @app.command()
 def history(domain: str = typer.Argument(..., help="Dominio.")) -> None:
     """Lista los escaneos guardados de un dominio."""

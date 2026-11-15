@@ -38,6 +38,16 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
+## Base de vulnerabilidades (CVE)
+
+El motor de tecnologías cruza las versiones detectadas con una base local de CVE descargada de NVD. Hay que descargarla una vez (y actualizarla de vez en cuando):
+
+```bash
+escaner update-cve          # unos minutos sin clave; con NVD_API_KEY es más rápido
+```
+
+Se guarda en `~/.escaner-web/cve.json` (o en `$ESCANER_DATA_DIR`). Los escaneos no consultan NVD: no se revela a terceros qué sitios se analizan.
+
 ## Uso previsto
 
 ```bash
