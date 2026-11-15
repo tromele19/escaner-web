@@ -249,3 +249,69 @@ def test_cli_report_sin_ia_degrada(tmp_path, monkeypatch):
     )
     out = CliRunner().invoke(app, ["report", str(scan_id)])
     assert out.exit_code == 1 and "export" in out.output
+
+
+# --- Partes deterministas (no las escribe la IA) ------------------------
+
+
+def test_nota_explicada_y_configuracion_salen_del_codigo(tmp_path):
+    _, _, scan = stored_scan(tmp_path, {"TECH_VERSION_DISCLOSED": "nginx 1.18.0"})
+    data = good_report()
+    data["plan"][0]["configuracion"] = "rm -rf /"  # lo que escriba el modelo se ignora
+    data["nota_explicada"] = "La nota es A"
+    rep = generate_report(sanitize(scan), FakeProvider(data)).report
+    assert "rm -rf" not in json.dumps(rep)
+    assert "Strict-Transport-Security" in rep["plan"][0]["configuracion"]
+    assert rep["nota_explicada"].startswith(f"Nota {scan['grade']} ({scan['global_score']}/100)")
+    assert rep["servidor_web"] == "nginx"
+
+
+def test_hallazgos_graves_que_la_ia_olvida_se_listan(tmp_path):
+    _, _, scan = stored_scan(tmp_path)
+    rep = generate_report(sanitize(scan), FakeProvider(good_report())).report
+    assert [h["id"] for h in rep["pendientes"]] == ["TECH_CVE_HIGH"] or "CSP_MISSING" in [
+        h["id"] for h in rep["pendientes"]
+    ]
+    assert "HSTS_MISSING" not in [h["id"] for h in rep["pendientes"]]
+
+
+def test_tope_por_critico_se_explica():
+    from escaner.ai.facts import explain_score
+
+    data = {
+        "letra": "D",
+        "nota_global": 69,
+        "modo": "completo",
+        "categorias": {"rutas": 60},
+        "hallazgos": [{"id": "GIT_REPO_EXPOSED", "severidad": "critica", "buena_practica": False}],
+    }
+    assert "crítico" in explain_score(data) and "69" in explain_score(data)
+
+
+def test_respuesta_real_de_qwen_sin_nota_ni_configuracion(tmp_path):
+    """Respuesta real de qwen2.5:3b contra inseguro.lab (15/11/2026): no trae
+    «nota_explicada» ni «configuracion» porque ya no se le piden."""
+    _, _, scan = stored_scan(tmp_path, {"TECH_VERSION_DISCLOSED": "nginx 1.18.0"})
+    real = {
+        "resumen": "El análisis de seguridad web del dominio ha mostrado varios problemas.",
+        "plan": [
+            {
+                "prioridad": 1,
+                "hallazgos": ["HSTS_MISSING"],
+                "accion": "Implementar HTTPS",
+                "por_que": "Evita ataques de redireccionamiento.",
+                "esfuerzo": "medio",
+            },
+            {
+                "prioridad": 2,
+                "hallazgos": ["TECH_VERSION_DISCLOSED"],
+                "accion": "Ocultar la versión",
+                "por_que": "Facilita ataques.",
+                "esfuerzo": "bajo",
+            },
+        ],
+    }
+    result = generate_report(sanitize(scan), FakeProvider(real))
+    assert result.attempts == 1 and result.discarded == []
+    assert "server_tokens off;" in result.report["plan"][1]["configuracion"]
+    assert result.report["nota_explicada"].startswith("Nota ")

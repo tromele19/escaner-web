@@ -340,8 +340,22 @@ def print_ai_report(rep: dict, model: str) -> None:
         )
         console.print(Text("   Hallazgos: " + ", ".join(step["hallazgos"]), style="dim"))
         console.print(Text("   " + step["por_que"]))
-        if step["configuracion"]:
+        if step.get("configuracion"):
             console.print(Text(step["configuracion"], style="green"))
+    if rep.get("pendientes"):
+        console.print(
+            Text("\nNo incluidos en el plan de la IA (revísalos también):", style="bold yellow")
+        )
+        for h in rep["pendientes"]:
+            console.print(Text(f"   [{h['severidad']}] {h['id']}: {h['titulo']}", style="yellow"))
+    if rep.get("servidor_web"):
+        console.print(
+            Text(
+                f"\nConfiguración de ejemplo para: {rep['servidor_web']} "
+                "(fragmentos revisados, no generados por la IA).",
+                style="dim",
+            )
+        )
 
 
 @app.command()
