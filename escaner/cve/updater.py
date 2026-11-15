@@ -8,6 +8,10 @@ terceros qué sitios se analizan) y funcionan sin conexión.
 
 Sin clave de API, NVD permite 5 peticiones cada 30 s: se espera 6 s entre
 peticiones. Con ``NVD_API_KEY`` (gratuita) el límite es mayor.
+
+NVD responde a menudo con 503 cuando está saturado: cada petición se
+reintenta con espera creciente y, si un producto sigue fallando, se guardan
+los demás y se indica cuál ha quedado incompleto.
 """
 
 from __future__ import annotations
@@ -24,7 +28,9 @@ import requests
 from escaner.cve import PRODUCTS
 
 API = "https://services.nvd.nist.gov/rest/json/cves/2.0"
-PAGE = 2000
+PAGE = 500  # páginas pequeñas: NVD devuelve 503 con frecuencia en consultas grandes
+RETRY_WAITS = (10, 20, 40, 80)  # segundos entre reintentos ante 429/5xx
+RETRY_STATUS = {429, 500, 502, 503, 504}
 
 
 def default_db_path() -> Path:
@@ -47,43 +53,73 @@ def update_database(
     headers = {"apiKey": api_key} if api_key else {}
     pause = 0.7 if api_key else 6.0
 
-    db = {"generated": datetime.now(UTC).isoformat(), "source": API, "products": {}}
+    db = {
+        "generated": datetime.now(UTC).isoformat(),
+        "source": API,
+        "products": {},
+        "incomplete": [],
+    }
     first = True
     for key, (name, cpes) in PRODUCTS.items():
         entries: dict[str, dict] = {}
-        for vendor, product in cpes:
-            start = 0
-            while True:
-                if not first:
-                    sleep(pause)
-                first = False
-                params = {
-                    "virtualMatchString": f"cpe:2.3:a:{vendor}:{product}",
-                    "resultsPerPage": PAGE,
-                    "startIndex": start,
-                }
-                resp = session.get(API, params=params, headers=headers, timeout=60)
-                resp.raise_for_status()
-                data = resp.json()
-                for item in data.get("vulnerabilities", []):
-                    entry = parse_cve(item.get("cve", {}), vendor, product)
-                    if entry:
-                        old = entries.get(entry["id"])
-                        if old:
-                            old["ranges"].extend(entry["ranges"])
-                        else:
-                            entries[entry["id"]] = entry
-                start += data.get("resultsPerPage", 0) or PAGE
-                if start >= data.get("totalResults", 0):
-                    break
+        try:
+            for vendor, product in cpes:
+                start = 0
+                while True:
+                    if not first:
+                        sleep(pause)
+                    first = False
+                    params = {
+                        "virtualMatchString": f"cpe:2.3:a:{vendor}:{product}",
+                        "resultsPerPage": PAGE,
+                        "startIndex": start,
+                    }
+                    data = _get_with_retries(session, params, headers, sleep, progress)
+                    for item in data.get("vulnerabilities", []):
+                        entry = parse_cve(item.get("cve", {}), vendor, product)
+                        if entry:
+                            old = entries.get(entry["id"])
+                            if old:
+                                old["ranges"].extend(entry["ranges"])
+                            else:
+                                entries[entry["id"]] = entry
+                    start += data.get("resultsPerPage", 0) or PAGE
+                    if start >= data.get("totalResults", 0):
+                        break
+        except requests.exceptions.RequestException as exc:
+            db["incomplete"].append(key)
+            progress(f"{name}: no se ha podido descargar ({exc.__class__.__name__}), se omite")
         db["products"][key] = sorted(entries.values(), key=lambda e: e["id"])
-        progress(f"{name}: {len(entries)} CVE")
+        if key not in db["incomplete"]:
+            progress(f"{name}: {len(entries)} CVE")
 
+    if len(db["incomplete"]) == len(PRODUCTS):
+        raise requests.exceptions.ConnectionError(
+            "NVD no ha respondido para ningún producto; inténtalo más tarde"
+        )
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(db, separators=(",", ":")), encoding="utf-8")
     tmp.replace(path)
     return db
+
+
+def _get_with_retries(session, params, headers, sleep, progress) -> dict:
+    """Petición a NVD con reintentos y espera creciente ante 429 y errores 5xx."""
+    for attempt, wait in enumerate((*RETRY_WAITS, None)):
+        try:
+            resp = session.get(API, params=params, headers=headers, timeout=60)
+            if resp.status_code not in RETRY_STATUS:
+                resp.raise_for_status()
+                return resp.json()
+            error = requests.exceptions.HTTPError(f"{resp.status_code} de NVD")
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:
+            error = exc
+        if wait is None:
+            raise error
+        progress(f"  NVD no responde ({error}); reintento {attempt + 1} en {wait} s")
+        sleep(wait)
+    raise AssertionError("inalcanzable")
 
 
 def parse_cve(cve: dict, vendor: str, product: str) -> dict | None:

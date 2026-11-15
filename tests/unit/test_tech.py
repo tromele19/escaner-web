@@ -130,8 +130,9 @@ class FakeNVD:
 
 
 class FakeResp:
-    def __init__(self, data):
+    def __init__(self, data, status=200):
         self._data = data
+        self.status_code = status
 
     def raise_for_status(self):
         pass
@@ -155,6 +156,59 @@ def test_update_database_pagina_respeta_el_limite_y_guarda(tmp_path):
     assert [e["id"] for e in db["products"]["php"]] == ["CVE-2021-21703", "CVE-2024-4577"]
     assert all(p == 6.0 for p in pauses)  # sin clave: 6 s entre peticiones
     assert json.loads(path.read_text())["products"]["php"][0]["cvss"] == 7.0
+
+
+class FlakyNVD(FakeNVD):
+    """Devuelve 503 las primeras veces, como hace NVD cuando está saturado."""
+
+    def __init__(self, per_product, failures):
+        super().__init__(per_product)
+        self.failures = failures
+
+    def get(self, url, params, headers, timeout):
+        if self.failures > 0:
+            self.failures -= 1
+            self.calls.append(params)
+            return FakeResp({}, status=503)
+        return super().get(url, params, headers, timeout)
+
+
+def test_reintenta_ante_503_con_espera_creciente(tmp_path):
+    nvd = FlakyNVD(
+        {"cpe:2.3:a:php:php": [nvd_cve("CVE-1", PHP_ANY, 9.8, versionEndExcluding="9")]}, failures=2
+    )
+    pauses = []
+    db = update_database(tmp_path / "cve.json", session=nvd, api_key="", sleep=pauses.append)
+    assert [e["id"] for e in db["products"]["php"]] == ["CVE-1"]
+    assert pauses[:2] == [10, 20]
+    assert db["incomplete"] == []
+
+
+def test_si_un_producto_no_descarga_se_guardan_los_demas(tmp_path):
+    class HalfDown(FakeNVD):
+        def get(self, url, params, headers, timeout):
+            if "nginx" in params["virtualMatchString"]:
+                self.calls.append(params)
+                return FakeResp({}, status=503)
+            return super().get(url, params, headers, timeout)
+
+    nvd = HalfDown({"cpe:2.3:a:php:php": [nvd_cve("CVE-1", PHP_ANY, 9.8, versionEndExcluding="9")]})
+    db = update_database(tmp_path / "cve.json", session=nvd, api_key="", sleep=lambda s: None)
+    assert db["incomplete"] == ["nginx"]
+    assert len(db["products"]["php"]) == 1
+    assert (tmp_path / "cve.json").exists()
+
+
+def test_si_nvd_no_responde_nada_da_error(tmp_path):
+    import requests
+
+    class Down(FakeNVD):
+        def get(self, url, params, headers, timeout):
+            return FakeResp({}, status=503)
+
+    with pytest.raises(requests.exceptions.ConnectionError):
+        update_database(tmp_path / "cve.json", session=Down({}), api_key="", sleep=lambda s: None)
+    assert not (tmp_path / "cve.json").exists()
 
 
 def test_ruta_por_defecto_aislada_en_las_pruebas(tmp_path):

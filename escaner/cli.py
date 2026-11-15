@@ -149,11 +149,16 @@ def update_cve() -> None:
     path = default_db_path()
     console.print(f"Descargando CVE de NVD en {path} (5 peticiones cada 30 s sin NVD_API_KEY)...")
     try:
-        update_database(path, progress=lambda msg: console.print(f"  {msg}"))
+        db = update_database(path, progress=lambda msg: console.print(f"  {msg}"))
     except requests.exceptions.RequestException as exc:
         console.print(Text(f"Error descargando de NVD: {exc}", style="bold red"))
         raise typer.Exit(code=1) from exc
     console.print(f"[green]Base de CVE actualizada:[/green] {path}")
+    if db.get("incomplete"):
+        console.print(
+            f"[yellow]Sin descargar (NVD no respondió):[/yellow] {', '.join(db['incomplete'])}. "
+            "Vuelve a ejecutar «escaner update-cve» más tarde."
+        )
 
 
 @app.command()
