@@ -17,6 +17,7 @@ from escaner.engines.content import ContentEngine
 from escaner.engines.cookies import CookiesEngine
 from escaner.engines.headers import HeadersEngine
 from escaner.engines.paths import PathsEngine
+from escaner.engines.tech import TechEngine
 from escaner.engines.tls import TLSEngine
 from escaner.models import ScanContext, ScanMode, ScanResult
 from escaner.rules.paths import ALL_PATHS
@@ -29,8 +30,15 @@ Prober = Callable[..., dict]
 
 
 def default_engines() -> list[Engine]:
-    """Motores disponibles. Falta el de tecnologías y CVE."""
-    return [TLSEngine(), HeadersEngine(), CookiesEngine(), PathsEngine(), ContentEngine()]
+    """Los seis motores de análisis de la memoria."""
+    return [
+        TLSEngine(),
+        HeadersEngine(),
+        CookiesEngine(),
+        TechEngine(),
+        PathsEngine(),
+        ContentEngine(),
+    ]
 
 
 def run_scan(
