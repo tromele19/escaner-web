@@ -1,0 +1,48 @@
+# Sitios públicos para la validación final (#17). Solo modo PASIVO: lo mismo que
+# vería un navegador. Formato: dominio  [grupo]
+# Grupo «control»: sitios de badssl.com hechos a propósito con certificados
+# rotos; el resultado esperado es F.
+
+# Grandes plataformas
+google.com            plataforma
+github.com            plataforma
+wikipedia.org         plataforma
+mozilla.org           plataforma
+cloudflare.com        plataforma
+microsoft.com         plataforma
+apple.com             plataforma
+stackoverflow.com     plataforma
+wordpress.org         plataforma
+example.com           plataforma
+
+# Medios de comunicación
+elpais.com            medios
+elmundo.es            medios
+rtve.es               medios
+bbc.co.uk             medios
+nytimes.com           medios
+
+# Administración y ciberseguridad
+boe.es                administracion
+incibe.es             administracion
+ccn-cert.cni.es       administracion
+seg-social.es         administracion
+dgt.es                administracion
+
+# Universidades
+u-tad.com             universidad
+uc3m.es               universidad
+ucm.es                universidad
+upm.es                universidad
+
+# Banca y servicios
+bbva.es               servicios
+caixabank.es          servicios
+renfe.com             servicios
+correos.es            servicios
+
+# Controles negativos (deben salir F)
+expired.badssl.com        control
+self-signed.badssl.com    control
+wrong.host.badssl.com     control
+untrusted-root.badssl.com control
