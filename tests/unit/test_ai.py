@@ -327,3 +327,16 @@ def test_recuento_cuenta_hallazgos_repetidos(tmp_path):
     from escaner.ai.facts import explain_score
 
     assert "2 alta" in explain_score(data)
+
+
+def test_tope_por_alta_se_explica():
+    from escaner.ai.facts import explain_score
+
+    data = {
+        "letra": "B",
+        "nota_global": 89,
+        "modo": "pasivo",
+        "categorias": {"cabeceras": 75},
+        "hallazgos": [{"id": "HSTS_MISSING", "severidad": "alta", "buena_practica": False}],
+    }
+    assert "severidad alta" in explain_score(data) and "89 (B)" in explain_score(data)
