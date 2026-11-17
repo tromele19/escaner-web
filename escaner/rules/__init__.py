@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 from escaner.models import Category, Finding, Severity
 
-RUBRIC_VERSION = "1.0"
+RUBRIC_VERSION = "1.1"  # 1.1: tope en B con un hallazgo de severidad alta
 
 
 @dataclass(frozen=True, slots=True)

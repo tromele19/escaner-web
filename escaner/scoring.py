@@ -33,6 +33,7 @@ WEIGHTS: dict[Category, int] = {
 
 GRADES: list[tuple[int, str]] = [(90, "A"), (80, "B"), (70, "C"), (60, "D"), (50, "E"), (0, "F")]
 
+HIGH_CAP = 89  # con un hallazgo de severidad alta, como mucho B (rúbrica 1.1)
 CRITICAL_CAP = 69  # con un hallazgo crítico, como mucho D
 NO_VALID_HTTPS_CAP = 49  # sin HTTPS válido, F (tabla 14 de la memoria)
 
@@ -67,7 +68,13 @@ def score_result(result: ScanResult) -> ScanResult:
 
     total_weight = sum(WEIGHTS[c] for c in evaluated)
     weighted = sum(result.category_scores[c] * WEIGHTS[c] for c in evaluated) / total_weight
-    if any(f.severity is Severity.CRITICAL for f in result.findings):
+    # Los topes solo cuentan hallazgos de categorías evaluadas.
+    relevant = [f for f in result.findings if f.category in evaluated]
+    if any(f.severity is Severity.HIGH for f in relevant):
+        # Una A tiene que significar «nada grave» (detectado en la validación:
+        # un sitio sin HSTS sacaba A por tener el resto perfecto).
+        weighted = min(weighted, HIGH_CAP)
+    if any(f.severity is Severity.CRITICAL for f in relevant):
         weighted = min(weighted, CRITICAL_CAP)
     if any(f.rule_id in FAIL_GRADE_RULES for f in result.findings):
         weighted = min(weighted, NO_VALID_HTTPS_CAP)

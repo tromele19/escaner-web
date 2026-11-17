@@ -26,7 +26,7 @@ nytimes.com           medios
 boe.es                administracion
 incibe.es             administracion
 ccn-cert.cni.es       administracion
-seg-social.es         administracion
+www.seg-social.es     administracion
 dgt.es                administracion
 
 # Universidades

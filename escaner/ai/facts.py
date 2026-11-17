@@ -8,7 +8,7 @@ deben ser exactas, cosa que un modelo pequeño no garantiza.
 from __future__ import annotations
 
 from escaner.rules.tls import FAIL_GRADE_RULES
-from escaner.scoring import CRITICAL_CAP, NO_VALID_HTTPS_CAP
+from escaner.scoring import CRITICAL_CAP, HIGH_CAP, NO_VALID_HTTPS_CAP
 
 SEVERITY_ORDER = ["critica", "alta", "media", "baja", "informativa"]
 PLAN_SEVERITIES = {"critica", "alta", "media"}
@@ -37,6 +37,11 @@ def explain_score(data: dict) -> str:
         parts.append(
             f"Hay al menos un hallazgo crítico, así que la nota se limita a "
             f"{CRITICAL_CAP} (D) aunque el resto esté bien."
+        )
+    elif counts["alta"] and (data.get("nota_global") or 0) >= HIGH_CAP:
+        parts.append(
+            f"Hay hallazgos de severidad alta, así que la nota se limita a {HIGH_CAP} (B) "
+            "aunque el resto esté bien."
         )
     if data.get("modo") == "pasivo":
         parts.append("Modo pasivo: no se han comprobado rutas sensibles.")

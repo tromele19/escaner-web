@@ -119,3 +119,22 @@ def test_sin_https_valido_la_nota_es_f():
     r = score_result(result(findings, set(WEIGHTS)))
     assert r.global_score == 49
     assert r.grade == "F"
+
+
+def test_un_hallazgo_alto_limita_la_nota_a_b():
+    """Rúbrica 1.1: detectado en la validación (stackoverflow.com sacaba A sin HSTS)."""
+    findings = [f(Severity.HIGH, Category.HEADERS)]
+    r = score_result(result(findings, set(WEIGHTS)))  # 75*20/100 + 80 = 95 sin el tope
+    assert r.global_score == 89 and r.grade == "B"
+    assert r.rubric_version == "1.1"
+
+
+def test_tope_por_alta_no_sube_una_nota_mas_baja():
+    findings = [f(Severity.HIGH, Category.HEADERS)] * 3
+    r = score_result(result(findings, {Category.HEADERS}))
+    assert r.global_score == 25.0
+
+
+def test_topes_ignoran_categorias_no_evaluadas():
+    r = score_result(result([f(Severity.CRITICAL, Category.PATHS)], {Category.HEADERS}))
+    assert r.global_score == 100.0
