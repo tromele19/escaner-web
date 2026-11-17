@@ -50,7 +50,6 @@ def scan(
         None, "--json", help="Guarda el resultado en un fichero JSON.", dir_okay=False
     ),
     save: bool = typer.Option(True, "--save/--no-save", help="Guardar en el histórico."),
-    profile: str = typer.Option("divulgativo", help="Perfil del informe: tecnico o divulgativo."),
 ) -> None:
     """Analiza una URL y muestra la nota y los hallazgos."""
     mode = ScanMode.PASSIVE
