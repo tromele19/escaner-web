@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Informe de seguridad - {{ domain }}</title>
+<style>
+  @page { size: A4; margin: 1.6cm 1.4cm; }
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 10pt; color: #1c2430; line-height: 1.4; max-width: 960px; margin: 0 auto; padding: 0 12px; }
+  h1 { font-size: 18pt; margin: 0 0 2px 0; }
+  h2 { font-size: 13pt; margin: 22px 0 8px 0; padding-bottom: 3px; border-bottom: 2px solid #1c2430; }
+  h3 { font-size: 11pt; margin: 14px 0 4px 0; }
+  .muted { color: #5b6573; font-size: 9pt; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; vertical-align: top; padding: 5px 6px; border-bottom: 1px solid #d9dee5; }
+  th { background: #eef1f5; font-size: 9pt; }
+  .head td { border: none; padding: 0; }
+  .grade { width: 92px; text-align: center; font-size: 38pt; font-weight: bold; color: #ffffff; padding: 6px 0; }
+  .g-A { background: #1f8a4c; } .g-B { background: #5b9e2d; } .g-C { background: #b8920b; }
+  .g-D { background: #d0661a; } .g-E { background: #c0392b; } .g-F { background: #8e1b12; }
+  .score { font-size: 15pt; font-weight: bold; }
+  .sev { font-weight: bold; font-size: 8.5pt; padding: 2px 5px; color: #ffffff; white-space: nowrap; }
+  .s-critica { background: #8e1b12; } .s-alta { background: #c0392b; } .s-media { background: #b8920b; }
+  .s-baja { background: #3d7ab8; } .s-informativa { background: #6b7684; }
+  .bar { background: #e3e7ec; height: 9px; }
+  .fill { background: #1c2430; height: 9px; }
+  .ev { font-family: Courier, monospace; font-size: 8.5pt; color: #3a4452; word-wrap: break-word; }
+  pre { font-family: Courier, monospace; font-size: 8.5pt; background: #f4f6f8; border-left: 3px solid #1c2430; padding: 6px 8px; white-space: pre-wrap; word-wrap: break-word; }
+  .ai { border: 1px solid #b9c3cf; padding: 6px 12px 10px 12px; }
+  .warn { background: #fff4d6; border-left: 3px solid #b8920b; padding: 6px 8px; font-size: 9pt; }
+  .step { margin-bottom: 10px; }
+  a { color: #1f5f9e; }
+</style>
+</head>
+<body>
+
+<table class="head">
+  <tr>
+    <td>
+      <h1>Informe de seguridad web</h1>
+      <div class="score">{{ domain }}</div>
+      <div class="muted">URL analizada: {{ scan.url }}{% if scan.final_url and scan.final_url != scan.url %} &rarr; {{ scan.final_url }}{% endif %}</div>
+      <div class="muted">Escaneo n.º {{ scan.id }} &middot; {{ scanned_at }} UTC &middot; modo {{ scan.mode }} &middot; rúbrica {{ scan.rubric_version }}</div>
+    </td>
+    <td class="grade g-{{ scan.grade or 'F' }}">{{ scan.grade or '-' }}</td>
+  </tr>
+</table>
+
+<p><span class="score">{{ scan.global_score if scan.global_score is not none else '-' }} / 100</span>
+&nbsp; Problemas:
+{% for sev in ['critica', 'alta', 'media', 'baja'] %}{% if counts[sev] %}<span class="sev s-{{ sev }}">{{ counts[sev] }} {{ sev }}</span> {% endif %}{% endfor %}
+{% if not (counts['critica'] or counts['alta'] or counts['media'] or counts['baja']) %}ninguno{% endif %}
+</p>
+{% if scan.mode == 'pasivo' %}
+<p class="muted">Modo pasivo: solo se ha analizado lo que vería un navegador; no se han comprobado rutas sensibles.</p>
+{% endif %}
+
+<h2>Nota por categoría</h2>
+<table>
+  <tr><th>Categoría</th><th style="width:60px">Peso</th><th style="width:70px">Nota</th><th style="width:40%"></th></tr>
+  {% for c in categories %}
+  <tr>
+    <td>{{ c.name }}</td>
+    <td>{{ c.weight }} %</td>
+    <td><b>{{ c.score if c.score is not none else 'n/e' }}</b></td>
+    <td>{% if c.score is not none %}<table><tr><td class="fill" style="width:{{ [c.score, 1]|max|int }}%; padding:0"></td><td class="bar" style="padding:0"></td></tr></table>{% else %}<span class="muted">no evaluada en este modo</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
+<p class="muted">La nota global es la media ponderada de las categorías evaluadas. Un hallazgo crítico limita la nota a D y no tener HTTPS válido la limita a F.</p>
+
+{% if ai %}
+<h2>Explicación y plan de remediación</h2>
+<div class="ai">
+  <p class="warn">Esta sección la ha redactado un modelo de IA ({{ ai.model }}) a partir del resultado técnico. La nota y los hallazgos no los decide la IA. Los fragmentos de configuración salen de un catálogo revisado. Revisa el plan antes de aplicarlo.</p>
+  <h3>Resumen</h3>
+  <p>{{ ai.content.resumen }}</p>
+  <h3>La nota</h3>
+  <p>{{ ai.content.nota_explicada }}</p>
+  <h3>Plan priorizado</h3>
+  {% for step in ai.content.plan %}
+  <div class="step">
+    <b>{{ step.prioridad }}. {{ step.accion }}</b> <span class="muted">(esfuerzo {{ step.esfuerzo }})</span><br>
+    <span class="muted">Hallazgos: {{ step.hallazgos|join(', ') }}</span><br>
+    {{ step.por_que }}
+    {% if step.configuracion %}<pre>{{ step.configuracion }}</pre>{% endif %}
+  </div>
+  {% endfor %}
+  {% if ai.content.pendientes %}
+  <p class="warn"><b>No incluidos en el plan (revísalos también):</b><br>
+  {% for h in ai.content.pendientes %}[{{ h.severidad }}] {{ h.id }}: {{ h.titulo }}<br>{% endfor %}</p>
+  {% endif %}
+  {% if ai.content.servidor_web %}<p class="muted">Configuración de ejemplo para: {{ ai.content.servidor_web }}.</p>{% endif %}
+</div>
+{% endif %}
+
+<h2>Hallazgos ({{ problems|length }})</h2>
+{% if problems %}
+<table>
+  <tr><th style="width:80px">Severidad</th><th style="width:85px">Categoría</th><th>Hallazgo y evidencia</th></tr>
+  {% for f in problems %}
+  <tr>
+    <td><span class="sev s-{{ f.severity }}">{{ f.severity }}</span></td>
+    <td>{{ f.category }}</td>
+    <td>
+      <b>{{ f.title }}</b> <span class="muted">{{ f.rule_id }}</span><br>
+      {% if f.evidence %}<span class="ev">{{ f.evidence }}</span><br>{% endif %}
+      {% if f.ref %}<a href="{{ f.ref }}" rel="noopener noreferrer">Referencia</a>{% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p>No se ha encontrado ningún problema.</p>
+{% endif %}
+
+{% if good %}
+<h2>Buenas prácticas detectadas ({{ good|length }})</h2>
+<table>
+  {% for f in good %}
+  <tr><td style="width:85px">{{ f.category }}</td><td><b>{{ f.title }}</b> <span class="muted">+{{ f.bonus }}</span></td></tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+<p class="muted" style="margin-top:24px">Generado por escaner-web {{ tool_version }} el {{ generated_at }}. Análisis de configuración no intrusivo; no sustituye a una auditoría de seguridad completa. Las CVE se basan en la versión anunciada por el servidor y deben verificarse (puede haber parches aplicados por la distribución).</p>
+
+</body>
+</html>

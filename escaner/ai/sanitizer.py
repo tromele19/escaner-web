@@ -19,6 +19,7 @@ Cualquier identificador que no esté en el catálogo se descarta.
 from __future__ import annotations
 
 import re
+from collections import Counter
 from urllib.parse import urlsplit
 
 from escaner.cve import PRODUCTS
@@ -42,6 +43,7 @@ def sanitize(scan: dict) -> dict:
     host = (urlsplit(scan.get("url", "")).hostname or "").lower()
     findings, techs = [], []
     seen = set()
+    times = Counter(f.get("rule_id", "") for f in scan.get("findings", []))
     for f in scan.get("findings", []):
         rule = RULES.get(f.get("rule_id", ""))
         if rule is None or rule.rule_id in seen:
@@ -54,6 +56,7 @@ def sanitize(scan: dict) -> dict:
                 "severidad": str(rule.severity),
                 "titulo": rule.title,
                 "buena_practica": rule.bonus > 0,
+                "veces": times[rule.rule_id],  # p. ej. versión anunciada por 3 tecnologías
             }
         )
     for f in scan.get("findings", []):

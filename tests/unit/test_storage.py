@@ -97,7 +97,7 @@ def test_cli_history_compare_y_export(tmp_path):
     assert r.exit_code == 0 and "Resueltos (1)" in r.stdout and "▲" in r.stdout
 
     out = tmp_path / "e.json"
-    r = runner.invoke(app, ["export", str(a), "--output", str(out)])
+    r = runner.invoke(app, ["export", str(a), "-f", "json", "--output", str(out)])
     data = json.loads(out.read_text())
     assert (
         r.exit_code == 0
