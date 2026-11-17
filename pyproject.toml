@@ -19,14 +19,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-pdf = ["weasyprint>=62"]
-pdf-windows = ["xhtml2pdf>=0.2.16"]
+pdf = ["xhtml2pdf>=0.2.16"]
+pdf-weasyprint = ["weasyprint>=62"]
 dev = [
     "pytest>=8",
     "pytest-cov>=5",
     "ruff>=0.6",
     "bandit>=1.7",
     "pip-audit>=2.7",
+    "xhtml2pdf>=0.2.16",
 ]
 
 [project.scripts]

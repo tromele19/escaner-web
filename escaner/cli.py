@@ -31,11 +31,6 @@ AUTH_WARNING = (
 )
 
 
-def _not_implemented(feature: str) -> None:
-    console.print(f"[yellow]{feature}: todavía no implementado.[/yellow]")
-    raise typer.Exit(code=2)
-
-
 @app.command()
 def version() -> None:
     """Muestra la versión de la herramienta."""
@@ -251,24 +246,53 @@ def compare(
 @app.command()
 def export(
     scan_id: int = typer.Argument(..., help="Id del escaneo (ver «escaner history»)."),
-    format: str = typer.Option("json", "--format", help="json (html y pdf, próximamente)."),
+    format: str = typer.Option("html", "--format", "-f", help="html, pdf o json."),
     output: Path | None = typer.Option(None, "--output", "-o", help="Fichero de salida."),
+    profile: str = typer.Option(
+        "divulgativo", "--profile", "-p", help="Informe de IA que se incluye, si existe."
+    ),
+    no_ai: bool = typer.Option(False, "--no-ai", help="No incluir el informe de IA."),
 ) -> None:
-    """Exporta el resultado de un escaneo guardado."""
+    """Exporta un escaneo guardado a HTML, PDF o JSON.
+
+    Si existe un informe de IA guardado («escaner report»), se incluye en HTML y PDF.
+    """
+    from escaner.reporting.html_report import ExportError, render_html, write_pdf
     from escaner.storage import Storage
 
-    scan = Storage().get_scan(scan_id)
+    store = Storage()
+    scan = store.get_scan(scan_id)
     if scan is None:
         console.print(Text(f"No existe el escaneo {scan_id}.", style="bold red"))
         raise typer.Exit(code=1)
-    if format != "json":
-        _not_implemented(f"export --format {format}")
-    content = stored_to_json(scan)
-    if output is None:
-        print(content)
+    format = format.lower()
+    if format not in {"html", "pdf", "json"}:
+        console.print(Text("El formato debe ser html, pdf o json.", style="bold red"))
+        raise typer.Exit(code=2)
+
+    if format == "json":
+        content = stored_to_json(scan)
+        if output is None:
+            print(content)
+        else:
+            output.write_text(content, encoding="utf-8")
+            console.print(Text(f"Exportado a {output}"))
+        return
+
+    ai = None if no_ai else store.get_report(scan_id, profile)
+    html = render_html(scan, ai)
+    output = output or Path(f"informe-{scan['domain']}-{scan_id}.{format}")
+    if format == "html":
+        output.write_text(html, encoding="utf-8")
+        engine = "html"
     else:
-        output.write_text(content, encoding="utf-8")
-        console.print(f"Exportado a {output}")
+        try:
+            engine = write_pdf(html, output)
+        except ExportError as exc:
+            console.print(Text(str(exc), style="bold red"))
+            raise typer.Exit(code=1) from exc
+    extra = "con informe de IA" if ai else "sin informe de IA"
+    console.print(Text(f"Exportado a {output} ({extra}; {engine})", style="green"))
 
 
 def _load_scan(scan_id: int):
