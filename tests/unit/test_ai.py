@@ -315,3 +315,15 @@ def test_respuesta_real_de_qwen_sin_nota_ni_configuracion(tmp_path):
     assert result.attempts == 1 and result.discarded == []
     assert "server_tokens off;" in result.report["plan"][1]["configuracion"]
     assert result.report["nota_explicada"].startswith("Nota ")
+
+
+def test_recuento_cuenta_hallazgos_repetidos(tmp_path):
+    """El mismo id puede salir varias veces (una por tecnología): el recuento de
+    la nota explicada tiene que coincidir con la tabla de hallazgos del informe."""
+    _, _, scan = stored_scan(tmp_path)
+    scan["findings"].append({**scan["findings"][0]})  # HSTS_MISSING repetido
+    data = sanitize(scan)
+    assert [h["id"] for h in data["hallazgos"]].count("HSTS_MISSING") == 1
+    from escaner.ai.facts import explain_score
+
+    assert "2 alta" in explain_score(data)

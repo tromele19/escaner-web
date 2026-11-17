@@ -19,7 +19,7 @@ es Python puro y funciona igual en Linux y Windows (opción por defecto).
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from jinja2 import Environment, PackageLoader, select_autoescape
@@ -89,7 +89,7 @@ def build_context(scan: dict, ai: dict | None = None) -> dict:
         "counts": counts,
         "ai": ai,
         "tool_version": __version__,
-        "generated_at": datetime.now().strftime("%d/%m/%Y %H:%M"),
+        "generated_at": datetime.now(UTC).strftime("%d/%m/%Y %H:%M UTC"),
         "scanned_at": scan["scanned_at"][:16].replace("T", " "),
     }
 

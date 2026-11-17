@@ -17,7 +17,9 @@ PLAN_SEVERITIES = {"critica", "alta", "media"}
 def explain_score(data: dict) -> str:
     cats = sorted(data.get("categorias", {}).items(), key=lambda kv: kv[1])
     problems = [h for h in data["hallazgos"] if not h["buena_practica"]]
-    counts = {s: sum(h["severidad"] == s for h in problems) for s in SEVERITY_ORDER}
+    counts = {
+        s: sum(h.get("veces", 1) for h in problems if h["severidad"] == s) for s in SEVERITY_ORDER
+    }
     parts = [
         f"Nota {data.get('letra')} ({data.get('nota_global')}/100), media ponderada de "
         f"{len(cats)} categorías."
