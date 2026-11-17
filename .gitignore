@@ -44,3 +44,4 @@ Thumbs.db
 # Resultados de escaneos guardados en la raíz
 /*.json
 resultados/
+informe-*

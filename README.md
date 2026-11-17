@@ -48,16 +48,19 @@ escaner update-cve          # unos minutos sin clave; con NVD_API_KEY es más r�
 
 Se guarda en `~/.escaner-web/cve.json` (o en `$ESCANER_DATA_DIR`). Los escaneos no consultan NVD: no se revela a terceros qué sitios se analizan.
 
-## Uso previsto
+## Uso
 
 ```bash
-escaner scan https://mi-sitio.es
-escaner scan https://mi-sitio.es --authorized --profile tecnico
-escaner history mi-sitio.es
-escaner compare mi-sitio.es --last 2
-escaner export 42 --format pdf
-escaner ask 42 "¿Cómo activo HSTS en Nginx?"
+escaner scan https://mi-sitio.es                  # modo pasivo
+escaner scan https://mi-sitio.es --authorized     # modo completo (solo sitios propios o autorizados)
+escaner history mi-sitio.es                       # escaneos guardados
+escaner compare mi-sitio.es                       # compara los dos últimos
+escaner report 42 --profile divulgativo           # informe y plan de remediación con IA
+escaner ask 42 "¿Cómo activo HSTS en Nginx?"      # pregunta sobre ese informe
+escaner export 42 -f html                         # también: -f pdf, -f json
 ```
+
+Para exportar a PDF hace falta instalar el motor: `pip install -e ".[pdf]"`.
 
 ## Estructura
 
